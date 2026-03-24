@@ -96,6 +96,7 @@ class _MyAppState extends State<MyApp> {
               rotateSide: RotateSide.bottom,
               // onTapFlipping: false,
               axis: FlipAxis.horizontal,
+              curve: Curves.easeInOutQuint,
               controller: con1,
               frontWidget: Center(
                 child: Container(

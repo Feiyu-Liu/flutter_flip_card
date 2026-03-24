@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../modal/flip_side.dart';
 import '../controllers/flip_card_controllers.dart';
+import '../modal/flip_side.dart';
 import 'dart:math';
 
 /// [FlipCard] A component that provides a flip card animation
@@ -27,6 +27,9 @@ class FlipCard extends StatefulWidget {
   /// [animationDuration] The amount of milliseconds a turn animation will take.
   final Duration animationDuration;
 
+  /// [curve] The animation easing used for the flip transition.
+  final Curve curve;
+
   /// [disableSplashEffect] The option for disable Inkwell widget's splash effect.
   final bool disableSplashEffect;
 
@@ -48,6 +51,7 @@ class FlipCard extends StatefulWidget {
     this.axis = FlipAxis.vertical,
     required this.rotateSide,
     this.animationDuration = const Duration(milliseconds: 800),
+    this.curve = Curves.linear,
   }) : super(key: key);
 
   @override
@@ -56,6 +60,7 @@ class FlipCard extends StatefulWidget {
 
 class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
   late AnimationController animationController;
+  late Animation<double> curvedAnimation;
   final flipCardController = FlipCardController();
   bool isFront = true;
   double anglePlus = 0;
@@ -64,8 +69,22 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
     super.initState();
     animationController =
         AnimationController(duration: widget.animationDuration, vsync: this);
+    curvedAnimation =
+        CurvedAnimation(parent: animationController, curve: widget.curve);
     widget.controller.state = this;
     flipCardController.state = this;
+  }
+
+  @override
+  void didUpdateWidget(covariant FlipCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animationDuration != widget.animationDuration) {
+      animationController.duration = widget.animationDuration;
+    }
+    if (oldWidget.curve != widget.curve) {
+      curvedAnimation =
+          CurvedAnimation(parent: animationController, curve: widget.curve);
+    }
   }
 
   @override
@@ -83,7 +102,7 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-      animation: animationController,
+      animation: curvedAnimation,
       builder: (context, child) {
         double piValue = 0.0;
         if (widget.rotateSide == RotateSide.top ||
@@ -92,7 +111,7 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
         } else {
           piValue = -pi;
         }
-        double angle = animationController.value * piValue;
+        double angle = curvedAnimation.value * piValue;
         late Matrix4 transform;
         late Matrix4 transformForBack;
         if (isFront) angle += anglePlus;
@@ -118,7 +137,7 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
           focusColor: widget.focusColor,
           overlayColor: widget.disableSplashEffect
               ? null
-              : MaterialStateProperty.all(Colors.transparent),
+              : WidgetStateProperty.all(Colors.transparent),
           child: Transform(
               alignment: Alignment.center,
               transform: transform,

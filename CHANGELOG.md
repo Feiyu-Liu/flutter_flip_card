@@ -1,3 +1,7 @@
+## Unreleased
+
+* Added a `curve` parameter to `FlipCard` for customizing flip animation easing.
+
 ## 0.0.6
 
 * [issue4 opend by vicenterusso ] Fix typos

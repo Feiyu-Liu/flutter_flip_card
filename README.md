@@ -23,60 +23,63 @@ import 'package:flutter_flip_card/flutter_flip_card.dart';
 ## FlipCard
 
 ```dart
-    FlipCard(
-        rotateSide: RotateSide.bottom,
-        onTapFlipping: false, //When enabled, the card will flip automatically when touched.
-        axis: FlipAxis.horizontal,
-        controller: con1,
-        frontWidget: Center(
-        child: Container(
-            height: 200,
-            width: 140,
-            child: Image.asset(
-                    'image/01.png',
-                    fit: BoxFit.fitHeight)
-                )
-            ),
-        backWidget: Container(
-            height: 200,
-            width: 140,
-            child: Image.asset(
-                    `'image/02.jpg',
-                    fit: BoxFit.fitHeight)
-            )
-        )
-        
-    final controller = FlipCardController();
-    // Flip the card programmatically
-    controller.flipcard();
+final controller = FlipCardController();
+
+FlipCard(
+  rotateSide: RotateSide.bottom,
+  onTapFlipping: false,
+  axis: FlipAxis.horizontal,
+  curve: Curves.easeInOut,
+  controller: controller,
+  frontWidget: Center(
+    child: SizedBox(
+      height: 200,
+      width: 140,
+      child: Image.asset(
+        'image/01.png',
+        fit: BoxFit.fitHeight,
+      ),
+    ),
+  ),
+  backWidget: SizedBox(
+    height: 200,
+    width: 140,
+    child: Image.asset(
+      'image/02.jpg',
+      fit: BoxFit.fitHeight,
+    ),
+  ),
+);
+
+controller.flipcard();
 ```
 ## GestureFlipCard
 
 ```dart
-    GestureFlipCard(
-            animationDuration: const Duration(milliseconds: 300),
-            axis: FlipAxis.horizontal,
-            controller:cong // used to ccontrol the Gesture flip programmatically
-            enableController : false // if [True] if you need flip the card using programmatically
-            frontWidget: Center(
-                child: Container(
-                  width: 300,
-                  height: 200,
-                  child: Image.asset(
-                    'image/011.jpg',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            backWidget: Container(
-                width: 300,
-                height: 200,
-                child: Image.asset(
-                  'image/11.jpg',
-                  fit: BoxFit.contain,
-                ),
-            ),
-        ),
+GestureFlipCard(
+  animationDuration: const Duration(milliseconds: 300),
+  axis: FlipAxis.horizontal,
+  controller: cong,
+  enableController: false,
+  frontWidget: Center(
+    child: SizedBox(
+      width: 300,
+      height: 200,
+      child: Image.asset(
+        'image/011.jpg',
+        fit: BoxFit.contain,
+      ),
+    ),
+  ),
+  backWidget: SizedBox(
+    width: 300,
+    height: 200,
+    child: Image.asset(
+      'image/11.jpg',
+      fit: BoxFit.contain,
+    ),
+  ),
+),
 ```
 
 #### Project Created & Maintained By
@@ -96,4 +99,3 @@ Please [open an issue](https://github.com/imtheguna/flutter_flip_card/issues) if
 You like the package ? Buy me a coffee :)
 
 <a href="https://www.buymeacoffee.com/imtheguna" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
-
