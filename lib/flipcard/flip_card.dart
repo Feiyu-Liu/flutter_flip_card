@@ -64,6 +64,7 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
   final flipCardController = FlipCardController();
   bool isFront = true;
   double anglePlus = 0;
+  RotateSide? _rotateSideOverride;
   @override
   void initState() {
     super.initState();
@@ -94,19 +95,21 @@ class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
   }
 
   ///Flip the card
-  Future flipCard() async {
+  Future flipCard({RotateSide? rotateSide}) async {
     if (animationController.isAnimating) return;
+    _rotateSideOverride = rotateSide;
     isFront = !isFront;
     await animationController.forward(from: 0).then((value) => anglePlus = pi);
+    _rotateSideOverride = null;
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: curvedAnimation,
       builder: (context, child) {
+        final rotateSide = _rotateSideOverride ?? widget.rotateSide;
         double piValue = 0.0;
-        if (widget.rotateSide == RotateSide.top ||
-            widget.rotateSide == RotateSide.left) {
+        if (rotateSide == RotateSide.top || rotateSide == RotateSide.left) {
           piValue = pi;
         } else {
           piValue = -pi;
