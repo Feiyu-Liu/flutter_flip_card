@@ -1,46 +1,15 @@
-import 'package:flutter/material.dart';
-import '../controllers/flip_card_controllers.dart';
-import '../modal/flip_side.dart';
+import 'dart:async';
 import 'dart:math';
 
-/// [FlipCard] A component that provides a flip card animation
+import 'package:flutter/material.dart';
 
+import '../controllers/flip_card_controllers.dart';
+import '../modal/flip_side.dart';
+
+/// A component that transitions between two children with a card flip.
 class FlipCard extends StatefulWidget {
-  /// [controller] used to ccontrol the flip
-  final FlipCardController controller;
-
-  ///[frontWidget] The Front side widget of the card
-  final Widget frontWidget;
-
-  ///[backWidget] The Back side widget of the card
-  final Widget backWidget;
-
-  /// [onTapFlipping]  When enabled, the card will flip automatically when touched.
-  final bool onTapFlipping;
-
-  /// [axis] The flip axis [Horizontal] and [Vertical]
-  final FlipAxis axis;
-
-  /// [rotateSide] The card rotate side
-  final RotateSide rotateSide;
-
-  /// [animationDuration] The amount of milliseconds a turn animation will take.
-  final Duration animationDuration;
-
-  /// [curve] The animation easing used for the flip transition.
-  final Curve curve;
-
-  /// [disableSplashEffect] The option for disable Inkwell widget's splash effect.
-  final bool disableSplashEffect;
-
-  /// [splashColor] The option for Inkwell widget's splashColor.
-  final Color? splashColor;
-
-  /// [focusColor] The option for Inkwell widget's focusColor.
-  final Color? focusColor;
-
   const FlipCard({
-    Key? key,
+    super.key,
     this.focusColor,
     this.splashColor,
     this.onTapFlipping = false,
@@ -52,111 +21,232 @@ class FlipCard extends StatefulWidget {
     required this.rotateSide,
     this.animationDuration = const Duration(milliseconds: 800),
     this.curve = Curves.linear,
-  }) : super(key: key);
+    this.side,
+    this.initialSide = FlipCardSide.front,
+    this.onFlipCompleted,
+  }) : assert(
+         side == null || !onTapFlipping,
+         'onTapFlipping is only available when side is uncontrolled.',
+       );
+
+  /// Controller used to flip the card imperatively.
+  final FlipCardController controller;
+
+  /// Front side widget.
+  final Widget frontWidget;
+
+  /// Back side widget.
+  final Widget backWidget;
+
+  /// Whether tapping toggles an uncontrolled card.
+  final bool onTapFlipping;
+
+  /// The flip axis.
+  final FlipAxis axis;
+
+  /// The direction in which the card rotates.
+  final RotateSide rotateSide;
+
+  /// Duration of a complete front-to-back flip.
+  final Duration animationDuration;
+
+  /// Curve used by each transition.
+  final Curve curve;
+
+  /// Controlled target side. When null, the controller owns the side.
+  final FlipCardSide? side;
+
+  /// Initial side used before any controlled or imperative transition.
+  final FlipCardSide initialSide;
+
+  /// Called after an animated or reduced-motion transition settles.
+  final ValueChanged<FlipCardSide>? onFlipCompleted;
+
+  /// Whether to disable the InkWell splash effect for tap flipping.
+  final bool disableSplashEffect;
+
+  final Color? splashColor;
+  final Color? focusColor;
 
   @override
   FlipCardState createState() => FlipCardState();
 }
 
-class FlipCardState extends State<FlipCard> with TickerProviderStateMixin {
-  late AnimationController animationController;
-  late Animation<double> curvedAnimation;
-  final flipCardController = FlipCardController();
-  bool isFront = true;
-  double anglePlus = 0;
+class FlipCardState extends State<FlipCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController animationController;
+  late FlipCardSide _targetSide;
   RotateSide? _rotateSideOverride;
+  bool _disableAnimations = false;
+  int _transitionGeneration = 0;
+
+  FlipCardSide get targetSide => _targetSide;
+
   @override
   void initState() {
     super.initState();
-    animationController =
-        AnimationController(duration: widget.animationDuration, vsync: this);
-    curvedAnimation =
-        CurvedAnimation(parent: animationController, curve: widget.curve);
+    _targetSide = widget.side ?? widget.initialSide;
+    animationController = AnimationController(
+      duration: widget.animationDuration,
+      value: _valueForSide(_targetSide),
+      vsync: this,
+    );
     widget.controller.state = this;
-    flipCardController.state = this;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bool disableAnimations =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (_disableAnimations == disableAnimations) {
+      return;
+    }
+    _disableAnimations = disableAnimations;
+    if (_disableAnimations && animationController.isAnimating) {
+      unawaited(showSide(_targetSide, animate: false));
+    }
   }
 
   @override
   void didUpdateWidget(covariant FlipCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      if (oldWidget.controller.state == this) {
+        oldWidget.controller.state = null;
+      }
+      widget.controller.state = this;
+    }
     if (oldWidget.animationDuration != widget.animationDuration) {
       animationController.duration = widget.animationDuration;
     }
-    if (oldWidget.curve != widget.curve) {
-      curvedAnimation =
-          CurvedAnimation(parent: animationController, curve: widget.curve);
+    final FlipCardSide? controlledSide = widget.side;
+    if (controlledSide != null && controlledSide != _targetSide) {
+      unawaited(showSide(controlledSide));
     }
   }
 
   @override
   void dispose() {
+    if (widget.controller.state == this) {
+      widget.controller.state = null;
+    }
     animationController.dispose();
     super.dispose();
   }
 
-  ///Flip the card
-  Future flipCard({RotateSide? rotateSide}) async {
-    if (animationController.isAnimating) return;
+  /// Toggles an uncontrolled card or the current controlled target.
+  Future<void> flipCard({RotateSide? rotateSide}) {
+    final FlipCardSide nextSide = _targetSide == FlipCardSide.front
+        ? FlipCardSide.back
+        : FlipCardSide.front;
+    return showSide(nextSide, rotateSide: rotateSide);
+  }
+
+  /// Moves the card to [side], preserving continuity if the target changes.
+  Future<void> showSide(
+    FlipCardSide side, {
+    RotateSide? rotateSide,
+    bool animate = true,
+  }) async {
+    final int transitionGeneration = ++_transitionGeneration;
+    _targetSide = side;
     _rotateSideOverride = rotateSide;
-    isFront = !isFront;
-    await animationController.forward(from: 0).then((value) => anglePlus = pi);
+    final double targetValue = _valueForSide(side);
+    final double distance = (animationController.value - targetValue).abs();
+
+    if (distance == 0) {
+      _rotateSideOverride = null;
+      return;
+    }
+
+    if (!animate ||
+        _disableAnimations ||
+        widget.animationDuration == Duration.zero) {
+      animationController.stop();
+      animationController.value = targetValue;
+      _completeTransition(side, transitionGeneration);
+      return;
+    }
+
+    final int durationMicros =
+        (widget.animationDuration.inMicroseconds * distance).round();
+    try {
+      await animationController
+          .animateTo(
+            targetValue,
+            duration: Duration(microseconds: durationMicros),
+            curve: widget.curve,
+          )
+          .orCancel;
+    } on TickerCanceled {
+      return;
+    }
+    _completeTransition(side, transitionGeneration);
+  }
+
+  void _completeTransition(FlipCardSide side, int transitionGeneration) {
+    if (!mounted || transitionGeneration != _transitionGeneration) {
+      return;
+    }
     _rotateSideOverride = null;
+    widget.onFlipCompleted?.call(side);
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-      animation: curvedAnimation,
-      builder: (context, child) {
-        final rotateSide = _rotateSideOverride ?? widget.rotateSide;
-        double piValue = 0.0;
-        if (rotateSide == RotateSide.top || rotateSide == RotateSide.left) {
-          piValue = pi;
-        } else {
-          piValue = -pi;
-        }
-        double angle = curvedAnimation.value * piValue;
-        late Matrix4 transform;
-        late Matrix4 transformForBack;
-        if (isFront) angle += anglePlus;
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animationController,
+      builder: (BuildContext context, Widget? child) {
+        final RotateSide rotateSide = _rotateSideOverride ?? widget.rotateSide;
+        final double direction =
+            rotateSide == RotateSide.top || rotateSide == RotateSide.left
+            ? 1
+            : -1;
+        final double angle = animationController.value * pi * direction;
+        final Matrix4 transform = Matrix4.identity()..setEntry(3, 2, 0.001);
         if (widget.axis == FlipAxis.horizontal) {
-          transform = Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateX(angle);
-          transformForBack = Matrix4.identity()..rotateX(pi);
+          transform.rotateX(angle);
         } else {
-          transform = Matrix4.identity()
-            ..setEntry(3, 2, 0.001)
-            ..rotateY(angle);
-          transformForBack = Matrix4.identity()..rotateY(pi);
+          transform.rotateY(angle);
         }
+        final bool showFront = animationController.value <= 0.5;
+        final Matrix4 backTransform = Matrix4.identity();
+        if (widget.axis == FlipAxis.horizontal) {
+          backTransform.rotateX(pi);
+        } else {
+          backTransform.rotateY(pi);
+        }
+        final Widget visibleSide = showFront
+            ? widget.frontWidget
+            : Transform(
+                transform: backTransform,
+                alignment: Alignment.center,
+                child: widget.backWidget,
+              );
+        final Widget transformedCard = Transform(
+          alignment: Alignment.center,
+          transform: transform,
+          child: visibleSide,
+        );
 
+        if (!widget.onTapFlipping) {
+          return transformedCard;
+        }
         return InkWell(
-          onTap: widget.onTapFlipping == false
-              ? null
-              : () {
-                  flipCardController.state!.flipCard();
-                },
+          onTap: () => unawaited(flipCard()),
           splashColor: widget.splashColor,
           focusColor: widget.focusColor,
           overlayColor: widget.disableSplashEffect
-              ? null
-              : WidgetStateProperty.all(Colors.transparent),
-          child: Transform(
-              alignment: Alignment.center,
-              transform: transform,
-              child: isFrontWidget(angle.abs())
-                  ? widget.frontWidget
-                  : Transform(
-                      transform: transformForBack,
-                      alignment: Alignment.center,
-                      child: widget.backWidget,
-                    )),
+              ? WidgetStateProperty.all<Color>(Colors.transparent)
+              : null,
+          child: transformedCard,
         );
-      });
+      },
+    );
+  }
 
-  bool isFrontWidget(double angle) {
-    const degrees90 = pi / 2;
-    const degrees270 = 3 * pi / 2;
-    return angle <= degrees90 || angle >= degrees270;
+  double _valueForSide(FlipCardSide side) {
+    return side == FlipCardSide.front ? 0 : 1;
   }
 }

@@ -7,8 +7,18 @@ class FlipCardController {
   FlipCardState? state;
 
   /// Flip the card
-  Future flipcard({RotateSide? rotateSide}) async =>
+  Future<void> flipcard({RotateSide? rotateSide}) async =>
       state?.flipCard(rotateSide: rotateSide);
+
+  /// Animates the card to [side] without relying on its current side.
+  Future<void> showSide(
+    FlipCardSide side, {
+    RotateSide? rotateSide,
+    bool animate = true,
+  }) async => state?.showSide(side, rotateSide: rotateSide, animate: animate);
+
+  /// The side the card is currently moving toward.
+  FlipCardSide? get side => state?.targetSide;
 }
 
 class GestureFlipCardController {
